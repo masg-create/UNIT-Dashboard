@@ -437,27 +437,45 @@ tr:hover td{background:rgba(255,255,255,0.03);}
     </div>
   </div>
 
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Flujo de Caja 2026 — Proyección Mensual</div>
-        <div class="card-badge">Actualizado Feb v2</div>
-      </div>
-      <div class="chart-wrap tall"><canvas id="chartFlujo2026"></canvas></div>
-      <div style="margin-top:10px;font-size:11px;color:var(--slate)">
-        6 de 12 meses con flujo negativo. Saldo inicial $299 MM → Real Feb $341 MM → Proyección Dic $222 MM.
-        Mes crítico: <strong style="color:var(--red)">Mayo -$171 MM</strong> por concentración de egresos.
-      </div>
+  <!-- Tabla completa flujo caja -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Flujo de Caja 2026 — Detalle Mensual</div>
+      <div class="card-badge">Ene–Feb REAL · Mar–Dic Proyectado</div>
     </div>
+    <div class="table-wrap">
+      <table id="cfTable2026">
+        <thead>
+          <tr>
+            <th>Mes</th>
+            <th>Saldo Anterior</th>
+            <th>Entradas</th>
+            <th>Salidas</th>
+            <th>Flujo Neto</th>
+            <th>Saldo Acumulado</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody id="cfTableBody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--slate)">
+      <strong style="color:var(--white)">Saldo Anterior:</strong> cierre del mes previo ·
+      <strong style="color:var(--white)">Flujo Neto:</strong> Entradas − Salidas (sin saldo anterior) ·
+      <strong style="color:var(--white)">Saldo Acumulado:</strong> lo que queda en caja para el mes siguiente
+    </div>
+  </div>
 
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Flujo Neto Mensual 2026</div>
-        <div class="card-badge">Barras positivo/negativo</div>
-      </div>
-      <div style="padding:8px 0">
-        <div id="cfBars2026"></div>
-      </div>
+  <!-- Gráfico doble: barras neto + línea saldo -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Flujo Neto vs Saldo en Caja 2026</div>
+      <div class="card-badge">Barras = flujo neto · Línea = saldo acumulado</div>
+    </div>
+    <div class="chart-wrap tall"><canvas id="chartFlujo2026"></canvas></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--slate)">
+      6 meses con flujo neto negativo. La línea del saldo muestra cuánta caja queda disponible cada mes.
+      Mes más crítico: <strong style="color:var(--red)">Mayo (neto -$171 MM, saldo $127 MM)</strong> — bajo piso mínimo $313 MM.
     </div>
   </div>
 
@@ -922,31 +940,92 @@ new Chart(document.getElementById('chartMensualComp'),{
   options:{...SC}
 });
 
-// Flujo 2026
-const fl26=[134.0,-92.0,41.6,-85.2,-170.7,26.3,-24.3,17.9,20.4,-12.5,48.2,19.8];
-const ac26=[432.8,340.8,382.5,297.2,126.5,152.8,128.5,146.4,166.8,154.3,202.5,222.4];
-new Chart(document.getElementById('chartFlujo2026'),{
-  type:'line',
-  data:{labels:M,datasets:[
-    {label:'Saldo acumulado',data:ac26,borderColor:'rgba(0,201,167,0.9)',backgroundColor:'rgba(0,201,167,0.08)',fill:true,tension:0.35,pointRadius:5,pointBackgroundColor:'rgba(0,201,167,1)'},
-    {label:'Piso mínimo $313 MM',data:Array(12).fill(313),borderColor:'rgba(245,166,35,0.5)',backgroundColor:'transparent',borderDash:[5,4],pointRadius:0,borderWidth:1.5},
-  ]},
-  options:{...SC}
+// ── FLUJO CAJA 2026 — datos exactos PPT slide 32 ──────────────────────
+const cf26 = [
+  {mes:'Ene', ant:299, ent:351, sal:-217, neto:134,  acum:433, real:true},
+  {mes:'Feb', ant:433, ent:381, sal:-473, neto:-92,  acum:341, real:true},
+  {mes:'Mar', ant:341, ent:358, sal:-317, neto:42,   acum:382, real:false},
+  {mes:'Abr', ant:382, ent:157, sal:-242, neto:-85,  acum:297, real:false},
+  {mes:'May', ant:297, ent:190, sal:-361, neto:-171, acum:127, real:false},
+  {mes:'Jun', ant:127, ent:182, sal:-156, neto:26,   acum:153, real:false},
+  {mes:'Jul', ant:153, ent:234, sal:-258, neto:-24,  acum:129, real:false},
+  {mes:'Ago', ant:129, ent:164, sal:-146, neto:18,   acum:146, real:false},
+  {mes:'Sep', ant:146, ent:164, sal:-143, neto:20,   acum:167, real:false},
+  {mes:'Oct', ant:167, ent:234, sal:-246, neto:-12,  acum:154, real:false},
+  {mes:'Nov', ant:154, ent:184, sal:-135, neto:48,   acum:203, real:false},
+  {mes:'Dic', ant:203, ent:234, sal:-214, neto:20,   acum:222, real:false},
+];
+
+// Tabla mensual detallada
+const tbody = document.getElementById('cfTableBody');
+cf26.forEach(r => {
+  const netoClass = r.neto >= 0 ? 'td-pos' : 'td-neg';
+  const acumWarn  = r.acum < 192 ? 'td-neg' : r.acum < 313 ? '' : 'td-pos';
+  const realTag   = r.real ? '<span class="tag tag-teal">REAL</span>' : '<span style="font-size:10px;color:var(--slate)">Proy.</span>';
+  const netoSign  = r.neto >= 0 ? '+' : '';
+  tbody.innerHTML += `<tr>
+    <td>${r.mes} ${realTag}</td>
+    <td>$${r.ant} MM</td>
+    <td class="td-pos">$${r.ent} MM</td>
+    <td class="td-neg">-$${Math.abs(r.sal)} MM</td>
+    <td class="${netoClass}">${netoSign}$${r.neto} MM</td>
+    <td class="${acumWarn}" style="font-weight:700">$${r.acum} MM</td>
+    <td>${r.acum < 192 ? '<span class="semaforo sem-red"><span class="sem-dot"></span>Bajo mín.</span>' : r.acum < 313 ? '<span class="semaforo sem-yellow"><span class="sem-dot"></span>Monitorear</span>' : '<span class="semaforo sem-green"><span class="sem-dot"></span>OK</span>'}</td>
+  </tr>`;
 });
 
-// Barras flujo neto 2026
-const cfContainer = document.getElementById('cfBars2026');
-const maxAbs = Math.max(...fl26.map(v=>Math.abs(v)));
-fl26.forEach((v,i)=>{
-  const pct = Math.round(Math.abs(v)/maxAbs*90);
-  cfContainer.innerHTML += `<div class="cf-bar">
-    <div class="cf-label">${M[i]}</div>
-    <div class="cf-track">
-      <div class="${v>=0?'cf-fill-pos':'cf-fill-neg'}" style="width:${pct}%">
-        <span class="cf-val">${v>=0?'+':''}${v}M</span>
-      </div>
-    </div>
-  </div>`;
+// Gráfico dual: barras neto + línea saldo acumulado
+new Chart(document.getElementById('chartFlujo2026'), {
+  type: 'bar',
+  data: {
+    labels: cf26.map(r=>r.mes),
+    datasets: [
+      {
+        type: 'bar',
+        label: 'Flujo Neto ($MM)',
+        data: cf26.map(r=>r.neto),
+        backgroundColor: cf26.map(r=>r.neto>=0?'rgba(0,201,167,0.55)':'rgba(255,77,106,0.55)'),
+        borderColor: cf26.map(r=>r.neto>=0?'rgba(0,201,167,0.9)':'rgba(255,77,106,0.9)'),
+        borderWidth:1, borderRadius:3, yAxisID:'yBar'
+      },
+      {
+        type: 'line',
+        label: 'Saldo Acumulado ($MM)',
+        data: cf26.map(r=>r.acum),
+        borderColor:'rgba(245,166,35,0.95)',
+        backgroundColor:'rgba(245,166,35,0.06)',
+        fill:true, tension:0.35, pointRadius:5,
+        pointBackgroundColor: cf26.map(r=>r.acum<192?'rgba(255,77,106,1)':r.acum<313?'rgba(245,166,35,1)':'rgba(0,201,167,1)'),
+        borderWidth:2, yAxisID:'yLine'
+      },
+      {
+        type: 'line',
+        label: 'Piso mínimo $313 MM',
+        data: Array(12).fill(313),
+        borderColor:'rgba(255,77,106,0.4)',
+        backgroundColor:'transparent',
+        borderDash:[5,4], pointRadius:0, borderWidth:1.5, yAxisID:'yLine'
+      }
+    ]
+  },
+  options: {
+    plugins: { legend: { labels: { color:'#a8b2c0', font:{family:'DM Sans',size:11}, boxWidth:12 } } },
+    scales: {
+      yBar: {
+        type:'linear', position:'left',
+        ticks:{ color:'#8892A4', font:{size:10}, callback:v=>'$'+v+'M' },
+        grid:{ color:'rgba(255,255,255,0.05)' },
+        title:{ display:true, text:'Flujo Neto', color:'#8892A4', font:{size:10} }
+      },
+      yLine: {
+        type:'linear', position:'right',
+        ticks:{ color:'#F5A623', font:{size:10}, callback:v=>'$'+v+'M' },
+        grid:{ drawOnChartArea:false },
+        title:{ display:true, text:'Saldo Acumulado', color:'#F5A623', font:{size:10} }
+      },
+      x:{ ticks:{ color:'#8892A4', font:{size:10} }, grid:{ color:'rgba(255,255,255,0.04)' } }
+    }
+  }
 });
 
 // Flujo 2025
